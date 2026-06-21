@@ -1,0 +1,49 @@
+name: Build Cryptomator (arm64-v8a only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restrict native libs to arm64-v8a only
+        run: |
+          python3 - <<'EOF'
+          path = "presentation/build.gradle"
+          with open(path) as f:
+              content = f.read()
+          marker = "defaultConfig {"
+          insert = "\n\t\tndk {\n\t\t\tabiFilters 'arm64-v8a'\n\t\t}\n"
+          idx = content.index(marker) + len(marker)
+          content = content[:idx] + insert + content[idx:]
+          with open(path, "w") as f:
+              f.write(content)
+          EOF
+          echo "Patched defaultConfig:"
+          sed -n '/defaultConfig {/,/^\t}/p' presentation/build.gradle | head -10
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK (apkstore flavor)
+        run: ./gradlew assembleApkstoreDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptomator-arm64-v8a-debug
+          path: presentation/build/outputs/apk/**/*.apk
+          if-no-files-found: error
