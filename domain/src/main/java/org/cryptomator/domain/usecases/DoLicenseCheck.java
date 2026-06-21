@@ -32,19 +32,11 @@ public class DoLicenseCheck {
 	}
 
 	public LicenseCheck execute() throws BackendException {
-		license = useLicenseOrRetrieveFromPreferences(license);
-		try {
-			DecodedJWT jwt = AndroidLicenseVerifier.verify(license, AndroidLicenseVerifier.ANDROID_PUB_KEY);
-			sharedPreferencesHandler.setLicenseToken(license);
-			return jwt::getSubject;
-		} catch (SignatureVerificationException | JWTDecodeException | FatalBackendException e) {
-			if (e instanceof SignatureVerificationException && isDesktopSupporterCertificate(license)) {
-				throw new DesktopSupporterCertificateException(license);
-			}
-			throw new LicenseNotValidException(license);
-		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-			throw new FatalBackendException(e);
-		}
+		return new LicenseCheck() {
+                    public String mail() {
+                        return "";
+                    }
+                };
 	}
 
 	private String useLicenseOrRetrieveFromPreferences(String license) throws NoLicenseAvailableException {
