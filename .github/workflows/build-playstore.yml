@@ -1,0 +1,61 @@
+name: Build Playstore Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g., v1.13.0-custom)'
+        required: true
+        default: 'v1.13.0-custom'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.jks
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build signed playstore release
+        env:
+          DROPBOX_API_KEY: ""
+          ONEDRIVE_API_KEY: ""
+          ONEDRIVE_API_REDIRCT_URI: ""
+          PCLOUD_CLIENT_ID: ""
+        run: |
+          ./gradlew assemblePlaystoreRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/release.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptomator-playstore-release
+          path: presentation/build/outputs/apk/playstore/release/*.apk
+          
+      - name: Publish to GitHub Releases Tab
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: "Cryptomator Custom Release ${{ github.event.inputs.tag_name }}"
+          body: "Custom build of Cryptomator Playstore flavor. Self-signed via GitHub Actions."
+          draft: false
+          prerelease: false
+          files: presentation/build/outputs/apk/playstore/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
